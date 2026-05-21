@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>即時文字雲</title>
+    <!-- 使用本地或穩定的 CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.2.2/wordcloud2.min.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #f0f2f5; margin: 0; padding: 20px; }
+        h1 { color: #333; }
+        #input-area { margin-bottom: 20px; }
+        input { padding: 10px; font-size: 16px; width: 200px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 20px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        
+        /* 容器設定 */
+        #canvas-container { 
+            width: 100%; 
+            height: 600px; /* 增加高度 */
+            background: white; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            position: relative; 
+            overflow: hidden;
+        }
+        
+        /* Canvas 設定為全寬高 */
+        canvas { 
+            display: block; 
+            width: 100%; 
+            height: 100%; 
+        }
+        
+        #loading-msg { 
+            position: absolute; 
+            top: 50%; left: 50%; 
+            transform: translate(-50%, -50%);
+            color: #888; font-size: 16px; 
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🌥️ 即時文字雲</h1>
+    
+    <div id="input-area">
+        <input type="text" id="wordInput" placeholder="輸入一個關鍵字..." maxlength="10">
+        <button id="submitBtn">送出</button>
+    </div>
+
+    <div id="canvas-container">
+        <div id="loading-msg">等待資料載入中...</div>
+        <canvas id="wordCloudCanvas"></canvas>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } 
+               from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+  apiKey: "AIzaSyC48oAqalT77SPpYVtCupYfV5hd6_ZrD2I",
+  authDomain: "my-teaching-tools-01.firebaseapp.com",
+  projectId: "my-teaching-tools-01",
+  storageBucket: "my-teaching-tools-01.firebasestorage.app",
+  messagingSenderId: "552535919921",
+  appId: "1:552535919921:web:95b4c1288edbae9572b410"
+};
+
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const input = document.getElementById('wordInput');
+        const btn = document.getElementById('submitBtn');
+        const canvas = document.getElementById('wordCloudCanvas');
+        const loadingMsg = document.getElementById('loading-msg');
+
+        // 送出資料
+        btn.addEventListener('click', async () => {
+            const word = input.value.trim();
+            if (!word) return;
+            try {
+                await addDoc(collection(db, "wordcloud_words"), {
+                    word: word,
+                    timestamp: serverTimestamp()
+                });
+                input.value = '';
+            } catch (e) {
+                console.error("送出失敗: ", e);
+                alert("送出失敗");
+            }
+        });
+
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') btn.click();
+        });
+
+        // 監聽與繪圖
+        onSnapshot(collection(db, "wordcloud_words"), (snapshot) => {
+            const wordCounts = {};
+            snapshot.forEach((doc) => {
+                const w = doc.data().word;
+                wordCounts[w] = (wordCounts[w] || 0) + 1;
+            });
+
+            const list = Object.entries(wordCounts).map(([word, count]) => [word, count * 15]); // 調整權重
+
+            if (list.length > 0) {
+                loadingMsg.style.display = 'none';
+                
+                // 🌟 高清畫質修正：根據螢幕解析度縮放 Canvas
+                const dpr = window.devicePixelRatio || 1;
+                const rect = canvas.parentElement.getBoundingClientRect();
+                
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.scale(dpr, dpr);
+
+                // 繪製文字雲
+                if (typeof window.WordCloud !== 'undefined') {
+                    window.WordCloud(canvas, {
+                        list: list,
+                        gridSize: Math.round(8 * dpr), // 網格也要縮放
+                        weightFactor: function (size) {
+                            return (size * rect.width) / 1024 * dpr; // 動態計算字體大小
+                        },
+                        fontFamily: 'Microsoft JhengHei, sans-serif',
+                        color: 'random-dark',
+                        backgroundColor: '#ffffff',
+                        rotateRatio: 0.3,
+                        rotationSteps: 2,
+                        shrinkToFit: true
+                    });
+                } else {
+                    loadingMsg.innerText = "❌ 套件載入失敗";
+                    loadingMsg.style.display = 'block';
+                }
+            } else {
+                loadingMsg.innerText = "尚無資料，請輸入關鍵字...";
+                loadingMsg.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>

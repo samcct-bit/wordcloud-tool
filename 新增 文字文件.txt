@@ -1,0 +1,8 @@
+{
+  apiKey: "AIzaSyC48oAqalT77SPpYVtCupYfV5hd6_ZrD2I",
+  authDomain: "my-teaching-tools-01.firebaseapp.com",
+  projectId: "my-teaching-tools-01",
+  storageBucket: "my-teaching-tools-01.firebasestorage.app",
+  messagingSenderId: "552535919921",
+  appId: "1:552535919921:web:95b4c1288edbae9572b410"
+};
