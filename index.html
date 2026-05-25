@@ -2,33 +2,61 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>即時文字雲</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.2.2/wordcloud2.min.js"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #f0f2f5; margin: 0; padding: 20px; }
-        h1 { color: #333; }
-        #input-area { margin-bottom: 20px; }
-        input { padding: 10px; font-size: 16px; width: 200px; border: 1px solid #ccc; border-radius: 4px; }
-        button { padding: 10px 20px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background: #0056b3; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Microsoft JhengHei', sans-serif; text-align: center; background: #f0f2f5; margin: 0; padding: 10px; }
+        h1 { color: #333; font-size: 1.5rem; margin: 10px 0; }
+        #input-area { margin-bottom: 15px; display: flex; justify-content: center; gap: 5px; flex-wrap: wrap; }
+        input { padding: 10px; font-size: 16px; width: 60%; max-width: 300px; border: 1px solid #ccc; border-radius: 4px; }
+        #submitBtn { padding: 10px 20px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        #submitBtn:hover { background: #0056b3; }
         
-        #canvas-container { 
-            width: 100%; height: 600px; background: white; 
-            border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
-            position: relative; overflow: hidden;
+        #cloud-container { 
+            width: 100%; min-height: 350px; height: 50vh;
+            background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+            align-content: center; gap: 8px; padding: 20px;
+            overflow-y: auto;
         }
-        canvas { display: block; width: 100%; height: 100%; }
-        #loading-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #888; font-size: 16px; }
         
-        /* 管理員按鈕樣式 */
+        /* 文字雲中的單字樣式 */
+        .cloud-word {
+            display: inline-block;
+            padding: 4px 6px;
+            cursor: default;
+            transition: transform 0.2s;
+            line-height: 1.2;
+        }
+        .cloud-word:hover { transform: scale(1.1); }
+        
+        #loading-msg { width: 100%; text-align: center; color: #888; font-size: 16px; }
+        
         #admin-btn {
-            position: fixed; bottom: 20px; right: 20px;
+            position: fixed; bottom: 10px; right: 10px;
             background: #eee; color: #888; border: none; border-radius: 50%;
             width: 40px; height: 40px; font-size: 20px; cursor: pointer;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2); opacity: 0.5; transition: 0.3s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); opacity: 0.5; z-index: 100;
         }
-        #admin-btn:hover { opacity: 1; background: #ddd; }
+        
+        /* 自訂密碼對話框 */
+        #pwd-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4); z-index: 999; justify-content: center; align-items: center;
+        }
+        #pwd-dialog {
+            background: white; border-radius: 12px; padding: 25px; width: 280px; text-align: center;
+            box-shadow: 0 5px 30px rgba(0,0,0,0.3);
+        }
+        #pwd-dialog h3 { margin: 0 0 15px; color: #333; }
+        #pwd-input { 
+            width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 6px;
+            margin-bottom: 15px; text-align: center;
+        }
+        #pwd-dialog button { margin: 0 5px; padding: 8px 20px; font-size: 14px; border: none; border-radius: 6px; cursor: pointer; }
+        #pwd-ok { background: #007bff; color: white; }
+        #pwd-cancel { background: #eee; color: #333; }
     </style>
 </head>
 <body>
@@ -36,17 +64,28 @@
     <h1>🌥️ 即時文字雲</h1>
     
     <div id="input-area">
-        <input type="text" id="wordInput" placeholder="輸入一個關鍵字..." maxlength="10">
+        <input type="text" id="wordInput" placeholder="輸入關鍵字..." maxlength="10">
         <button id="submitBtn">送出</button>
     </div>
 
-    <div id="canvas-container">
+    <!-- 改用純 div 顯示文字雲，不再依賴 Canvas 和外部套件 -->
+    <div id="cloud-container">
         <div id="loading-msg">等待資料載入中...</div>
-        <canvas id="wordCloudCanvas"></canvas>
     </div>
 
-    <!-- 管理員按鈕 -->
     <button id="admin-btn" title="管理員設定">⚙️</button>
+
+    <!-- 自訂密碼視窗 (解決手機 prompt 問題) -->
+    <div id="pwd-overlay">
+        <div id="pwd-dialog">
+            <h3>管理員驗證</h3>
+            <input type="password" id="pwd-input" placeholder="請輸入密碼" autocomplete="off">
+            <div>
+                <button id="pwd-ok">確定</button>
+                <button id="pwd-cancel">取消</button>
+            </div>
+        </div>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -54,117 +93,167 @@
                from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
-  apiKey: "AIzaSyC48oAqalT77SPpYVtCupYfV5hd6_ZrD2I",
-  authDomain: "my-teaching-tools-01.firebaseapp.com",
-  projectId: "my-teaching-tools-01",
-  storageBucket: "my-teaching-tools-01.firebasestorage.app",
-  messagingSenderId: "552535919921",
-  appId: "1:552535919921:web:95b4c1288edbae9572b410"
-};
+            apiKey: "AIzaSyC48oAqalT77SPpYVtCupYfV5hd6_ZrD2I",
+            authDomain: "my-teaching-tools-01.firebaseapp.com",
+            projectId: "my-teaching-tools-01",
+            storageBucket: "my-teaching-tools-01.firebasestorage.app",
+            messagingSenderId: "552535919921",
+            appId: "1:552535919921:web:95b4c1288edbae9572b410"
+        };
 
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
         const input = document.getElementById('wordInput');
-        const btn = document.getElementById('submitBtn');
-        const canvas = document.getElementById('wordCloudCanvas');
+        const submitBtn = document.getElementById('submitBtn');
+        const cloudContainer = document.getElementById('cloud-container');
         const loadingMsg = document.getElementById('loading-msg');
         const adminBtn = document.getElementById('admin-btn');
+        
+        // 密碼視窗相關
+        const pwdOverlay = document.getElementById('pwd-overlay');
+        const pwdInput = document.getElementById('pwd-input');
+        const pwdOk = document.getElementById('pwd-ok');
+        const pwdCancel = document.getElementById('pwd-cancel');
 
-        // 送出資料
-        btn.addEventListener('click', async () => {
+        let currentWords = {};
+        let adminCallback = null;
+
+        // === 送出資料 ===
+        submitBtn.addEventListener('click', async () => {
             const word = input.value.trim();
             if (!word) return;
             try {
-                await addDoc(collection(db, "wordcloud_words"), {
-                    word: word,
-                    timestamp: serverTimestamp()
-                });
+                await addDoc(collection(db, "wordcloud_words"), { word: word, timestamp: serverTimestamp() });
                 input.value = '';
             } catch (e) {
-                console.error("送出失敗: ", e);
-                alert("送出失敗");
+                alert("送出失敗，請確認網路與 Firebase 設定");
             }
         });
 
-        input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') btn.click();
-        });
+        input.addEventListener('keypress', (e) => { if (e.key === 'Enter') submitBtn.click(); });
 
-        // 🌟 管理員功能：清空資料庫
-        adminBtn.addEventListener('click', async () => {
-            const password = prompt("請輸入管理員密碼：");
-            if (password === "vgtrn939") { // 你可以在這裡修改密碼
-                if (confirm("確定要清空所有文字雲資料嗎？此操作無法復原。")) {
-                    loadingMsg.innerText = "正在清空資料...";
-                    loadingMsg.style.display = 'block';
-                    
-                    try {
-                        await deleteCollection(db, collection(db, "wordcloud_words"), 500);
-                        alert("資料已清空！");
-                        location.reload(); // 重新整理頁面
-                    } catch (err) {
-                        console.error("清空失敗:", err);
-                        alert("清空失敗，請稍後再試。");
-                        loadingMsg.style.display = 'none';
-                    }
-                }
-            } else if (password !== null) {
-                alert("密碼錯誤！");
-            }
-        });
-
-        // 批次刪除函數
-        async function deleteCollection(db, collectionRef, batchSize) {
-            const q = query(collectionRef, limit(batchSize));
-            const snapshot = await getDocs(q);
-            if (snapshot.size === 0) return 0;
-
-            const batch = writeBatch(db);
-            snapshot.docs.forEach((doc) => {
-                batch.delete(doc.ref);
-            });
-            await batch.commit();
-            return snapshot.size;
+        // === 密碼視窗 ===
+        function showPasswordDialog(callback) {
+            adminCallback = callback;
+            pwdInput.value = '';
+            pwdOverlay.style.display = 'flex';
+            pwdInput.focus();
         }
 
-        // 監聽與繪圖
+        function hidePasswordDialog() {
+            pwdOverlay.style.display = 'none';
+            adminCallback = null;
+        }
+
+        pwdOk.addEventListener('click', () => {
+            const pwd = pwdInput.value;
+            hidePasswordDialog();
+            if (adminCallback) adminCallback(pwd);
+        });
+
+        pwdCancel.addEventListener('click', () => {
+            hidePasswordDialog();
+        });
+
+        pwdInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') pwdOk.click();
+        });
+
+        // 點擊遮罩關閉
+        pwdOverlay.addEventListener('click', (e) => {
+            if (e.target === pwdOverlay) hidePasswordDialog();
+        });
+
+        // === 管理員功能 ===
+        adminBtn.addEventListener('click', () => {
+            showPasswordDialog(async (password) => {
+                if (password.toLowerCase().trim() === "teacher") {
+                    const action = prompt("選擇操作：\n1. 清空資料\n2. 重繪文字雲", "2");
+                    if (action === "1") {
+                        if (confirm("確定清空所有資料？")) {
+                            loadingMsg.textContent = "正在清空...";
+                            try {
+                                const colRef = collection(db, "wordcloud_words");
+                                const q = query(colRef, limit(500));
+                                const snap = await getDocs(q);
+                                const batch = writeBatch(db);
+                                snap.docs.forEach(doc => batch.delete(doc.ref));
+                                await batch.commit();
+                                location.reload();
+                            } catch (err) {
+                                alert("清空失敗");
+                            }
+                        }
+                    } else if (action === "2") {
+                        renderCloud(currentWords);
+                        alert("重繪完成！");
+                    }
+                } else {
+                    alert("密碼錯誤！");
+                }
+            });
+        });
+
+        // === 純 JS 文字雲繪製 (不需任何外部套件) ===
+        const colors = ["#e74c3c","#e67e22","#f1c40f","#2ecc71","#1abc9c","#3498db","#9b59b6","#34495e","#e84393","#00b894"];
+
+        function renderCloud(wordCounts) {
+            const entries = Object.entries(wordCounts);
+            
+            if (entries.length === 0) {
+                loadingMsg.textContent = "尚無資料，請輸入關鍵字...";
+                return;
+            }
+
+            loadingMsg.textContent = '';
+            
+            // 計算字體大小
+            const counts = entries.map(e => e[1]);
+            const maxCount = Math.max(...counts);
+            const minCount = Math.min(...counts);
+            const range = maxCount - minCount || 1;
+
+            // 清空並填入單字
+            cloudContainer.innerHTML = '';
+            
+            // 隨機排列，讓每次顯示感覺不同
+            const shuffled = [...entries].sort(() => Math.random() - 0.5);
+            
+            shuffled.forEach(([word, count]) => {
+                const span = document.createElement('span');
+                span.className = 'cloud-word';
+                
+                // 字體大小：最少 16px，最多 56px
+                const ratio = (count - minCount) / range;
+                const fontSize = 16 + ratio * 40;
+                span.style.fontSize = fontSize + 'px';
+                
+                // 隨機顏色
+                span.style.color = colors[Math.floor(Math.random() * colors.length)];
+                
+                // 隨機旋轉 (-15 到 +15 度)
+                const rotate = (Math.random() * 30 - 15).toFixed(1);
+                span.style.transform = `rotate(${rotate}deg)`;
+                
+                // 隨機字重：熱門字更粗
+                span.style.fontWeight = ratio > 0.7 ? 'bold' : 'normal';
+                
+                span.textContent = word;
+                cloudContainer.appendChild(span);
+            });
+        }
+
+        // === 監聽 Firebase 資料 ===
         onSnapshot(collection(db, "wordcloud_words"), (snapshot) => {
             const wordCounts = {};
             snapshot.forEach((doc) => {
                 const w = doc.data().word;
                 wordCounts[w] = (wordCounts[w] || 0) + 1;
             });
-
-            const list = Object.entries(wordCounts).map(([word, count]) => [word, count * 15]);
-
-            if (list.length > 0) {
-                loadingMsg.style.display = 'none';
-                const dpr = window.devicePixelRatio || 1;
-                const rect = canvas.parentElement.getBoundingClientRect();
-                canvas.width = rect.width * dpr;
-                canvas.height = rect.height * dpr;
-                const ctx = canvas.getContext('2d');
-                ctx.scale(dpr, dpr);
-
-                if (typeof window.WordCloud !== 'undefined') {
-                    window.WordCloud(canvas, {
-                        list: list,
-                        gridSize: Math.round(8 * dpr),
-                        weightFactor: function (size) { return (size * rect.width) / 1024 * dpr; },
-                        fontFamily: 'Microsoft JhengHei, sans-serif',
-                        color: 'random-dark',
-                        backgroundColor: '#ffffff',
-                        rotateRatio: 0.3,
-                        rotationSteps: 2,
-                        shrinkToFit: true
-                    });
-                }
-            } else {
-                loadingMsg.innerText = "尚無資料，請輸入關鍵字...";
-                loadingMsg.style.display = 'block';
-            }
+            currentWords = wordCounts;
+            renderCloud(wordCounts);
         });
     </script>
 </body>
