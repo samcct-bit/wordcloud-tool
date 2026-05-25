@@ -149,8 +149,9 @@
 
         pwdOk.addEventListener('click', () => {
             const pwd = pwdInput.value;
+            const cb = adminCallback;
             hidePasswordDialog();
-            if (adminCallback) adminCallback(pwd);
+            if (cb) cb(pwd);
         });
 
         pwdCancel.addEventListener('click', () => {
